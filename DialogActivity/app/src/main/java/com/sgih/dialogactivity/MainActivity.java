@@ -11,6 +11,7 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.hardware.camera2.CameraCharacteristics;
+import android.media.MediaPlayer;
 import android.media.MediaRecorder;
 import android.net.Uri;
 import android.os.AsyncTask;
@@ -51,11 +52,19 @@ import com.microsoft.projectoxford.emotion.contract.Scores;
 import com.microsoft.projectoxford.emotion.rest.EmotionServiceException;
 import com.yalantis.guillotine.animation.GuillotineAnimation;
 
+import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.ProtocolException;
+import java.net.URL;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -64,6 +73,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Random;
+
+import javax.net.ssl.HttpsURLConnection;
 
 import ai.api.AIListener;
 import ai.api.AIServiceContext;
@@ -88,6 +100,7 @@ public class MainActivity extends AppCompatActivity implements AIListener {
     TextToSpeech ttobj;
     ScrollView sv;
     EditText et;
+    MediaPlayer mediaPlayer;
     TextView tv;
     RecyclerView recyclerView;
     List<Message> messageList;
@@ -100,6 +113,7 @@ public class MainActivity extends AppCompatActivity implements AIListener {
     int clicked = 0;
     Toolbar toolbar;
     FrameLayout root;
+    File file;
     View contentHamburger;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -111,7 +125,17 @@ public class MainActivity extends AppCompatActivity implements AIListener {
         toolbar = findViewById(R.id.toolbar);
         root = findViewById(R.id.root);
         et = findViewById(R.id.et);
-
+        String path = getExternalFilesDir(Environment.DIRECTORY_PICTURES).toString();
+        Log.d("Files", "Path: " + path);
+        File directory = new File(path);
+        File[] files = directory.listFiles();
+        Log.d("Files", "Size: "+ files.length);
+        for (int i = 0; i < files.length; i++)
+        {
+            Log.d("Files", "FileName:" + files[i].getName());
+        }
+        File file = files[0];
+        String photoPath = getExternalFilesDir(Environment.DIRECTORY_PICTURES).toString() + "/" + files[0].getName();
         contentHamburger = findViewById(R.id.content_hamburger);
         if (toolbar != null) {
             setSupportActionBar(toolbar);
@@ -210,7 +234,7 @@ public class MainActivity extends AppCompatActivity implements AIListener {
             requestTask.execute(aiRequest);
         }
     }
-public void callback(AIResponse aiResponse) {
+    public void callback(AIResponse aiResponse) {
     if (aiResponse != null) {
         // process aiResponse here
         String botReply = aiResponse.getResult().getFulfillment().getSpeech();
@@ -256,6 +280,9 @@ public void callback(AIResponse aiResponse) {
                 }
             }
         });
+        Random random = new Random();
+        int[] ids = new int[]{-1800002, -1800003, -1800005, -1800006, -1800007, -1800009, -1800000};
+        int idR = ids[random.nextInt(6)];
         if(result.getFulfillment().getSpeech().contains("yes")  && result.getFulfillment().getSpeech().contains("photo")) {
             dispatchTakePictureIntent();
         }
@@ -263,12 +290,22 @@ public void callback(AIResponse aiResponse) {
                 Intent intent = new Intent(MainActivity.this, DiaryEntry.class);
                 startActivity(intent);
         }
-            else if(result.getFulfillment().getSpeech().contains("diary"))
-        {
-            Intent intent = new Intent(MainActivity.this, DiaryEntry.class);
-            startActivity(intent);
+        else if(result.getResolvedQuery().contains("stop")) {
+            if (mediaPlayer.isPlaying()) {
+                mediaPlayer.stop();
+                mediaPlayer.release();
+                Log.i("Status: ", "Stopped playing");
+            }
         }
-    }
+
+        else if(result.getFulfillment().getSpeech().contains("diary")) {
+            Intent intent = new Intent(MainActivity.this, DiaryEntry.class);
+            startActivity(intent); }
+            else if(result.getFulfillment().getSpeech().contains("music")){
+            mediaPlayer = MediaPlayer.create(MainActivity.this, R.raw.f3);
+            mediaPlayer.start();
+            }
+        }
 
     @Override
     public void onError(AIError error) {
@@ -342,6 +379,7 @@ public void callback(AIResponse aiResponse) {
             }
         }
     }
+
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
